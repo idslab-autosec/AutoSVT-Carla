@@ -1,32 +1,49 @@
-# Prerequisites
-*.d
+Build
+Dist
+Doxygen
+Deprecated/PythonClient/dist
+TrafficManager/build
+Util/Build
+Install
+Plugins
+!Unreal/CarlaUE4/Plugins
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+/ExportedMaps
+/Import/*
+!/Import/README.md
 
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
+*.VC.db
+*.VC.opendb
 *.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+*.egg-info
+*.kdev4
+*.log
+*.o
+*.pb.cc
+*.pb.h
+*.pid
+*.pri
+*.pro
+*.py[cod]
+*.sln
+*.so
+*.stackdump
+*.sublime-workspace
+*.workspace
+*CodeCompletionFolders.txt
+*CodeLitePreProcessor.txt
+.aria2c.input
+.codelite
+.gdb_history
+.gtest
+.idea
+.tags*
+.vs
+.vscode
+__pycache__
+_benchmarks_results
+_images*
+_out*
+_site
+core
+profiler.csv
