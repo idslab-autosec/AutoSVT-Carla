@@ -972,7 +972,7 @@ void UActorBlueprintFunctionLibrary::MakeLidarDefinition(
   StdDevLidar.Type = EActorAttributeType::Float;
   StdDevLidar.RecommendedValues = { TEXT("0.0") };
 
-  if (Id == "ray_cast") {
+  if (Id == "ray_cast" || Id == "ray_cast_with_fog") {
     Definition.Variations.Append({
       Channels,
       Range,

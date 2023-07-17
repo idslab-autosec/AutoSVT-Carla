@@ -22,7 +22,7 @@
 
 FActorDefinition ARayCastLidarWithFog::GetSensorDefinition()
 {
-  return UActorBlueprintFunctionLibrary::MakeLidarDefinition(TEXT("ray_cast"));
+  return UActorBlueprintFunctionLibrary::MakeLidarDefinition(TEXT("ray_cast_with_fog"));
 }
 
 
