@@ -3,7 +3,6 @@
 //
 // This work is licensed under the terms of the MIT license.
 // For a copy, see <https://opensource.org/licenses/MIT>.
-
 #include <PxScene.h>
 #include <cmath>
 #include "Carla.h"
@@ -19,6 +18,10 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/CollisionProfile.h"
 #include "Runtime/Engine/Classes/Kismet/KismetMathLibrary.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 FActorDefinition ARayCastLidarWithFog::GetSensorDefinition()
 {

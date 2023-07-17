@@ -15,7 +15,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Landscape.h"
 #include "Scalability.h"
-
+#include "Game/CarlaGameInstance.h"
 
 static constexpr float CARLA_SETTINGS_MAX_SCALE_SIZE = 50.0f;
 
