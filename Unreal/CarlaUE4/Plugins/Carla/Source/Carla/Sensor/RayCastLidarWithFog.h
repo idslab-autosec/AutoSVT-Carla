@@ -24,29 +24,29 @@ class CARLA_API ARayCastLidarWithFog : public ARayCastSemanticLidar
 {
 	GENERATED_BODY()
 
-	using FLidarData = carla::sensor::data::LidarData;
+		using FLidarData = carla::sensor::data::LidarData;
 	using FDetection = carla::sensor::data::LidarDetection;
 
 public:
 	static FActorDefinition GetSensorDefinition();
 
-	ARayCastLidarWithFog(const FObjectInitializer &ObjectInitializer);
-	virtual void Set(const FActorDescription &Description) override;
-	virtual void Set(const FLidarDescription &LidarDescription) override;
+	ARayCastLidarWithFog(const FObjectInitializer& ObjectInitializer);
+	virtual void Set(const FActorDescription& Description) override;
+	virtual void Set(const FLidarDescription& LidarDescription) override;
 
-	virtual void PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaTime);
+	virtual void PostPhysTick(UWorld* World, ELevelTick TickType, float DeltaTime);
 
 private:
 	/// Compute the received intensity of the point
-	float ComputeIntensity(const FSemanticDetection &RawDetection) const;
-	FDetection ComputeDetection(const FHitResult &HitInfo, const FTransform &SensorTransf) const;
+	float ComputeIntensity(const FSemanticDetection& RawDetection) const;
+	FDetection ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const;
 
 	void PreprocessRays(uint32_t Channels, uint32_t MaxPointsPerChannel) override;
-	bool PostprocessDetection(FDetection &Detection) const;
+	bool PostprocessDetection(FDetection& Detection) const;
 
-	void ComputeAndSaveDetections(const FTransform &SensorTransform) override;
+	void ComputeAndSaveDetections(const FTransform& SensorTransform) override;
 
-	std::vector<std::string> SplitString(const std::string &Input, char Delimiter) const;
+	std::vector<std::string> SplitString(const std::string& Input, char Delimiter) const;
 
 	void GetStepSizeData(std::string Alpha) const;
 
