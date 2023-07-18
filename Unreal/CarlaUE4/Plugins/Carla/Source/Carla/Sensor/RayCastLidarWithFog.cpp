@@ -28,14 +28,14 @@ FActorDefinition ARayCastLidarWithFog::GetSensorDefinition()
 	return UActorBlueprintFunctionLibrary::MakeLidarDefinition(TEXT("ray_cast_with_fog"));
 }
 
-
-ARayCastLidarWithFog::ARayCastLidarWithFog(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer) {
+ARayCastLidarWithFog::ARayCastLidarWithFog(const FObjectInitializer &ObjectInitializer)
+	: Super(ObjectInitializer)
+{
 	RandomEngine = CreateDefaultSubobject<URandomEngine>(TEXT("RandomEngine"));
 	SetSeed(Description.RandomSeed);
 }
 
-void ARayCastLidarWithFog::Set(const FActorDescription& ActorDescription)
+void ARayCastLidarWithFog::Set(const FActorDescription &ActorDescription)
 {
 	ASensor::Set(ActorDescription);
 	FLidarDescription LidarDescription;
@@ -43,7 +43,7 @@ void ARayCastLidarWithFog::Set(const FActorDescription& ActorDescription)
 	Set(LidarDescription);
 }
 
-void ARayCastLidarWithFog::Set(const FLidarDescription& LidarDescription)
+void ARayCastLidarWithFog::Set(const FLidarDescription &LidarDescription)
 {
 	Description = LidarDescription;
 	LidarData = FLidarData(Description.Channels);
@@ -56,7 +56,7 @@ void ARayCastLidarWithFog::Set(const FLidarDescription& LidarDescription)
 	DropOffGenActive = Description.DropOffGenRate > std::numeric_limits<float>::epsilon();
 }
 
-void ARayCastLidarWithFog::PostPhysTick(UWorld* World, ELevelTick TickType, float DeltaTime)
+void ARayCastLidarWithFog::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaTime)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(ARayCastLidarWithFog::PostPhysTick);
 	SimulateLidar(DeltaTime);
@@ -68,7 +68,7 @@ void ARayCastLidarWithFog::PostPhysTick(UWorld* World, ELevelTick TickType, floa
 	}
 }
 
-float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection& RawDetection) const
+float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection &RawDetection) const
 {
 	const carla::geom::Location HitPoint = RawDetection.point;
 	const float Distance = HitPoint.Length();
@@ -81,7 +81,7 @@ float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection& RawDetect
 	return IntRec;
 }
 
-ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const
+ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult &HitInfo, const FTransform &SensorTransf) const
 {
 	FDetection Detection;
 	const FVector HitPoint = HitInfo.ImpactPoint;
@@ -122,13 +122,13 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		// ParameterSet
 		float Mor = std::log(20) / Alpha;
 		float Beta = 0.046f / Mor;
-		float Gamma = 0.000001;
+		float Gamma = 0.000001f;
 
-		//   AActor* HitActor = HitInfo.GetActor();
-		//   if (HitActor != nullptr)
-		//   {
-		// 	  Gamma = GetReflectanceFromHitResult(HitInfo) / std::pow(10, 5);
-		//   }
+		AActor *HitActor = HitInfo.GetActor();
+		if (HitActor != nullptr)
+		{
+			Gamma = GetReflectanceFromHitResult(HitInfo) / std::pow(10, 5);
+		}
 
 		float Beta1 = Gamma / M_PI;
 		float RoundedIntRec = static_cast<int>(std::round(Distance * 10)) / 10.0;
@@ -137,7 +137,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		std::string Key(buffer);
 
 		// R_tmp, i_soft
-		const std::vector<std::string>& Data = StepSizeData.at(Key);
+		const std::vector<std::string> &Data = StepSizeData.at(Key);
 		float StepDataDistance = std::stof(Data[0]);
 		float StepDataIntRec = std::stof(Data[1]);
 
@@ -162,13 +162,14 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			float NoiseFactor = Distance / DistanceNoise;
 			float TotalScaling = ScalingFactor * NoiseFactor;
 
-			Detection.point.x *= TotalScaling;// 公式(16)
+			Detection.point.x *= TotalScaling; // 公式(16)
 			Detection.point.y *= TotalScaling; // 公式(17)
 			Detection.point.z *= TotalScaling; // 公式(18)
 			Detection.intensity = StepDataIntRec;
 		}
 	}
-	else {
+	else
+	{
 		Detection.intensity = static_cast<int>(OriginalIntesity);
 	}
 	Detection.point.y *= -1;
@@ -176,39 +177,46 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	return Detection;
 }
 
-void ARayCastLidarWithFog::PreprocessRays(uint32_t Channels, uint32_t MaxPointsPerChannel) {
+void ARayCastLidarWithFog::PreprocessRays(uint32_t Channels, uint32_t MaxPointsPerChannel)
+{
 	Super::PreprocessRays(Channels, MaxPointsPerChannel);
 
-	for (auto ch = 0u; ch < Channels; ch++) {
-		for (auto p = 0u; p < MaxPointsPerChannel; p++) {
+	for (auto ch = 0u; ch < Channels; ch++)
+	{
+		for (auto p = 0u; p < MaxPointsPerChannel; p++)
+		{
 			RayPreprocessCondition[ch][p] = !(DropOffGenActive && RandomEngine->GetUniformFloat() < Description.DropOffGenRate);
 		}
 	}
 }
 
-bool ARayCastLidarWithFog::PostprocessDetection(FDetection& Detection) const
+bool ARayCastLidarWithFog::PostprocessDetection(FDetection &Detection) const
 {
-	if (Description.NoiseStdDev > std::numeric_limits<float>::epsilon()) {
+	if (Description.NoiseStdDev > std::numeric_limits<float>::epsilon())
+	{
 		const auto ForwardVector = Detection.point.MakeUnitVector();
 		const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
 		Detection.point += Noise;
 	}
 
-	const float Intensity = Detection.intensity;
-	if (Intensity > (Description.DropOffIntensityLimit * 255))
+	const float Intensity = Detection.intensity / 255;
+	if (Intensity > Description.DropOffIntensityLimit)
 		return true;
 	else
 		return RandomEngine->GetUniformFloat() < DropOffAlpha * Intensity + DropOffBeta;
 }
 
-void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform& SensorTransform) {
+void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform &SensorTransform)
+{
 	for (auto idxChannel = 0u; idxChannel < Description.Channels; ++idxChannel)
 		PointsPerChannel[idxChannel] = RecordedHits[idxChannel].size();
 
 	LidarData.ResetMemory(PointsPerChannel);
 
-	for (auto idxChannel = 0u; idxChannel < Description.Channels; ++idxChannel) {
-		for (auto& hit : RecordedHits[idxChannel]) {
+	for (auto idxChannel = 0u; idxChannel < Description.Channels; ++idxChannel)
+	{
+		for (auto &hit : RecordedHits[idxChannel])
+		{
 			FDetection Detection = ComputeDetection(hit, SensorTransform);
 			if (PostprocessDetection(Detection))
 				LidarData.WritePointSync(Detection);
@@ -219,7 +227,7 @@ void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform& SensorTran
 
 	LidarData.WriteChannelCount(PointsPerChannel);
 }
-std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string& Input, char Delimiter) const
+std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string &Input, char Delimiter) const
 {
 	std::vector<std::string> Tokens;
 	size_t Start = 0;
@@ -261,7 +269,7 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 		// 输出每一行内容
 		Temp = SplitString(Line, ':');
 		Temp1 = SplitString(Temp[1], ',');
-		StepSizeData[Temp[0]] = { Temp1[0], Temp1[1] };
+		StepSizeData[Temp[0]] = {Temp1[0], Temp1[1]};
 	}
 
 	// 关闭文件
@@ -305,20 +313,27 @@ std::string ARayCastLidarWithFog::GetAlphaByFogDensity(float FogDensity) const
 	return "0.005";
 }
 
-float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult& HitResult) const
+float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult &HitResult) const
 {
 	TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
+	float Reflectance = 0.1f;
 	if (HitComponent != nullptr)
 	{
-		UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
+		UMaterialInterface *Material = HitComponent->GetMaterial(HitResult.FaceIndex);
 		if (Material != nullptr)
 		{
-			float Roughness = 0.1f;
+			float Roughness = 0.01;
 			Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
-			std::cout << Roughness << std::endl;
-			float Reflectance = std::pow(1 - std::sqrt(1 - Roughness), 5);
-			return Reflectance;
+			Reflectance = std::pow(1 - std::sqrt(1 - Roughness), 5);
 		}
 	}
-	return 0.1f;
+	if (Reflectance < 0.01f)
+	{
+		Reflectance = 0.01f;
+	}
+	else if (Reflectance > 1)
+	{
+		Reflectance = 0.99f;
+	}
+	return Reflectance;
 }
