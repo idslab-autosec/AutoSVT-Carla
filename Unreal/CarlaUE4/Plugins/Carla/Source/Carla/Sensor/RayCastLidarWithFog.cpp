@@ -331,7 +331,7 @@ float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult &HitRes
 	{
 		Reflectance = 0.01f;
 	}
-	else if (Reflectance > 1)
+	else if (Reflectance >= 1)
 	{
 		Reflectance = 0.99f;
 	}
