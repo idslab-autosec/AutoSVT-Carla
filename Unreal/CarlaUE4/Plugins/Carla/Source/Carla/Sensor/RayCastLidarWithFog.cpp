@@ -95,6 +95,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	float OriginalIntesity = AbsAtm * 255;
 
 	FWeatherParameters weather = GetEpisode().GetWeather()->GetCurrentWeather();
+	uint32_t is_modified = 0;
 	float FogDensity = weather.FogDensity;
 	const std::string AlphaKey = GetAlphaByFogDensity(FogDensity);
 
@@ -124,9 +125,15 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		float Beta = 0.046f / Mor;
 		float Gamma = 0.000001f;
 
-		AActor *HitActor = HitInfo.GetActor();
+		const AActor *HitActor = HitInfo.Actor.Get();
+		const FActorRegistry &Registry = GetEpisode().GetActorRegistry();
 		if (HitActor != nullptr)
 		{
+			const FCarlaActor *view = Registry.FindCarlaActor(HitActor);
+			if (view)
+			{
+				Detection.actor_type = static_cast<uint8_t>(view->GetActorType());
+			}
 			Gamma = GetReflectanceFromHitResult(HitInfo) / std::pow(10, 5);
 		}
 
@@ -166,6 +173,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			Detection.point.y *= TotalScaling; // 公式(17)
 			Detection.point.z *= TotalScaling; // 公式(18)
 			Detection.intensity = StepDataIntRec;
+			is_modified = 1;
 		}
 	}
 	else
@@ -173,7 +181,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		Detection.intensity = static_cast<int>(OriginalIntesity);
 	}
 	Detection.point.y *= -1;
-
+	Detection.is_modified = is_modified;
 	return Detection;
 }
 
@@ -246,7 +254,7 @@ std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string &In
 }
 void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 {
-	std::string FilePath = "/home/ak/data/";
+	std::string FilePath = "D:\\carla\\data\\";
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
 	std::string FullPath = FilePath + FileName;
 

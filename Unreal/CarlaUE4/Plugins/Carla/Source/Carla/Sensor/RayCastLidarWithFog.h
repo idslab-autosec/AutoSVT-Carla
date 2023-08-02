@@ -24,8 +24,8 @@ class CARLA_API ARayCastLidarWithFog : public ARayCastSemanticLidar
 {
 	GENERATED_BODY()
 
-		using FLidarData = carla::sensor::data::LidarData;
-	using FDetection = carla::sensor::data::LidarDetection;
+		using FLidarData = carla::sensor::data::LidarWithFogData;
+	using FDetection = carla::sensor::data::LidarWithFogDetection;
 
 public:
 	static FActorDefinition GetSensorDefinition();

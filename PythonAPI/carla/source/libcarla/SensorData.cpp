@@ -16,6 +16,7 @@
 #include <carla/sensor/data/Image.h>
 #include <carla/sensor/data/LaneInvasionEvent.h>
 #include <carla/sensor/data/LidarMeasurement.h>
+#include <carla/sensor/data/LidarWithFogMeasurement.h>
 #include <carla/sensor/data/SemanticLidarMeasurement.h>
 #include <carla/sensor/data/GnssMeasurement.h>
 #include <carla/sensor/data/RadarMeasurement.h>
@@ -54,6 +55,14 @@ namespace data {
 
   std::ostream &operator<<(std::ostream &out, const LidarMeasurement &meas) {
     out << "LidarMeasurement(frame=" << std::to_string(meas.GetFrame())
+        << ", timestamp=" << std::to_string(meas.GetTimestamp())
+        << ", number_of_points=" << std::to_string(meas.size())
+        << ')';
+    return out;
+  }
+
+  std::ostream &operator<<(std::ostream &out, const LidarWithFogMeasurement &meas) {
+    out << "LidarWithFogMeasurement(frame=" << std::to_string(meas.GetFrame())
         << ", timestamp=" << std::to_string(meas.GetTimestamp())
         << ", number_of_points=" << std::to_string(meas.size())
         << ')';
@@ -151,6 +160,17 @@ namespace data {
         << ", y=" << std::to_string(det.point.y)
         << ", z=" << std::to_string(det.point.z)
         << ", intensity=" << std::to_string(det.intensity)
+        << ')';
+    return out;
+  }
+
+  std::ostream &operator<<(std::ostream &out, const LidarWithFogDetection &det) {
+    out << "LidarWithFogDetection(x=" << std::to_string(det.point.x)
+        << ", y=" << std::to_string(det.point.y)
+        << ", z=" << std::to_string(det.point.z)
+        << ", intensity=" << std::to_string(det.intensity)
+        << ", is_modified=" << std::to_string(det.is_modified)
+        << ", actor_type=" << std::to_string(det.actor_type)
         << ')';
     return out;
   }
@@ -457,6 +477,23 @@ void export_sensor_data() {
     .def(self_ns::str(self_ns::self))
   ;
 
+  class_<csd::LidarWithFogMeasurement, bases<cs::SensorData>, boost::noncopyable, boost::shared_ptr<csd::LidarWithFogMeasurement>>("LidarWithFogMeasurement", no_init)
+    .add_property("horizontal_angle", &csd::LidarWithFogMeasurement::GetHorizontalAngle)
+    .add_property("channels", &csd::LidarWithFogMeasurement::GetChannelCount)
+    .add_property("raw_data", &GetRawDataAsBuffer<csd::LidarWithFogMeasurement>)
+    .def("get_point_count", &csd::LidarWithFogMeasurement::GetPointCount, (arg("channel")))
+    .def("save_to_disk", &SavePointCloudToDisk<csd::LidarWithFogMeasurement>, (arg("path")))
+    .def("__len__", &csd::LidarWithFogMeasurement::size)
+    .def("__iter__", iterator<csd::LidarWithFogMeasurement>())
+    .def("__getitem__", +[](const csd::LidarWithFogMeasurement &self, size_t pos) -> csd::LidarWithFogDetection {
+      return self.at(pos);
+    })
+    .def("__setitem__", +[](csd::LidarWithFogMeasurement &self, size_t pos, const csd::LidarWithFogDetection &detection) {
+      self.at(pos) = detection;
+    })
+    .def(self_ns::str(self_ns::self))
+  ;
+
   class_<csd::SemanticLidarMeasurement, bases<cs::SensorData>, boost::noncopyable, boost::shared_ptr<csd::SemanticLidarMeasurement>>("SemanticLidarMeasurement", no_init)
     .add_property("horizontal_angle", &csd::SemanticLidarMeasurement::GetHorizontalAngle)
     .add_property("channels", &csd::SemanticLidarMeasurement::GetChannelCount)
@@ -533,6 +570,14 @@ void export_sensor_data() {
   class_<csd::LidarDetection>("LidarDetection")
     .def_readwrite("point", &csd::LidarDetection::point)
     .def_readwrite("intensity", &csd::LidarDetection::intensity)
+    .def(self_ns::str(self_ns::self))
+  ;
+
+  class_<csd::LidarWithFogDetection>("LidarWithFogDetection")
+    .def_readwrite("point", &csd::LidarWithFogDetection::point)
+    .def_readwrite("intensity", &csd::LidarWithFogDetection::intensity)
+    .def_readwrite("is_modified", &csd::LidarWithFogDetection::is_modified)
+    .def_readwrite("actor_type", &csd::LidarWithFogDetection::actor_type)
     .def(self_ns::str(self_ns::self))
   ;
 

@@ -23,6 +23,7 @@
 #include "carla/sensor/s11n/OpticalFlowImageSerializer.h"
 #include "carla/sensor/s11n/IMUSerializer.h"
 #include "carla/sensor/s11n/LidarSerializer.h"
+#include "carla/sensor/s11n/LidarWithFogSerializer.h"
 #include "carla/sensor/s11n/NoopSerializer.h"
 #include "carla/sensor/s11n/ObstacleDetectionEventSerializer.h"
 #include "carla/sensor/s11n/RadarSerializer.h"
@@ -75,7 +76,7 @@ namespace sensor {
     std::pair<ARadar *, s11n::RadarSerializer>,
     std::pair<ARayCastSemanticLidar *, s11n::SemanticLidarSerializer>,
     std::pair<ARayCastLidar *, s11n::LidarSerializer>,
-    std::pair<ARayCastLidarWithFog *, s11n::LidarSerializer>,
+    std::pair<ARayCastLidarWithFog *, s11n::LidarWithFogSerializer>,
     std::pair<ARssSensor *, s11n::NoopSerializer>,
     std::pair<ASceneCaptureCamera *, s11n::ImageSerializer>,
     std::pair<ASemanticSegmentationCamera *, s11n::ImageSerializer>,
