@@ -255,7 +255,6 @@ std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string& In
 }
 void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 {
-	//std::string FilePath = "/home/ak/data/";
 	std::string FilePath = GetPathSeparator();
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
 	std::string FullPath = FilePath + FileName;
