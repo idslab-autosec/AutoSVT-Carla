@@ -28,14 +28,14 @@ FActorDefinition ARayCastLidarWithFog::GetSensorDefinition()
 	return UActorBlueprintFunctionLibrary::MakeLidarDefinition(TEXT("ray_cast_with_fog"));
 }
 
-ARayCastLidarWithFog::ARayCastLidarWithFog(const FObjectInitializer &ObjectInitializer)
+ARayCastLidarWithFog::ARayCastLidarWithFog(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	RandomEngine = CreateDefaultSubobject<URandomEngine>(TEXT("RandomEngine"));
 	SetSeed(Description.RandomSeed);
 }
 
-void ARayCastLidarWithFog::Set(const FActorDescription &ActorDescription)
+void ARayCastLidarWithFog::Set(const FActorDescription& ActorDescription)
 {
 	ASensor::Set(ActorDescription);
 	FLidarDescription LidarDescription;
@@ -43,7 +43,7 @@ void ARayCastLidarWithFog::Set(const FActorDescription &ActorDescription)
 	Set(LidarDescription);
 }
 
-void ARayCastLidarWithFog::Set(const FLidarDescription &LidarDescription)
+void ARayCastLidarWithFog::Set(const FLidarDescription& LidarDescription)
 {
 	Description = LidarDescription;
 	LidarData = FLidarData(Description.Channels);
@@ -56,7 +56,7 @@ void ARayCastLidarWithFog::Set(const FLidarDescription &LidarDescription)
 	DropOffGenActive = Description.DropOffGenRate > std::numeric_limits<float>::epsilon();
 }
 
-void ARayCastLidarWithFog::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaTime)
+void ARayCastLidarWithFog::PostPhysTick(UWorld* World, ELevelTick TickType, float DeltaTime)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(ARayCastLidarWithFog::PostPhysTick);
 	SimulateLidar(DeltaTime);
@@ -68,7 +68,7 @@ void ARayCastLidarWithFog::PostPhysTick(UWorld *World, ELevelTick TickType, floa
 	}
 }
 
-float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection &RawDetection) const
+float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection& RawDetection) const
 {
 	const carla::geom::Location HitPoint = RawDetection.point;
 	const float Distance = HitPoint.Length();
@@ -81,7 +81,7 @@ float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection &RawDetect
 	return IntRec;
 }
 
-ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult &HitInfo, const FTransform &SensorTransf) const
+ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const
 {
 	FDetection Detection;
 	const FVector HitPoint = HitInfo.ImpactPoint;
@@ -92,7 +92,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	const float AttenAtm = Description.AtmospAttenRate;
 	const float AbsAtm = exp(-AttenAtm * Distance);
 
-	float OriginalIntesity = AbsAtm * 255;
+	float OriginalIntensity = static_cast<uint32_t>(AbsAtm * 255);
 
 	FWeatherParameters weather = GetEpisode().GetWeather()->GetCurrentWeather();
 	uint32_t is_modified = 0;
@@ -117,7 +117,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	{
 		// hard
 		float Alpha = std::stof(AlphaKey);
-		float HardIntRec = std::round(exp(-2 * Alpha * Distance) * OriginalIntesity);
+		float HardIntRec = std::round(exp(-2 * Alpha * Distance) * OriginalIntensity);
 
 		// soft
 		// ParameterSet
@@ -125,14 +125,14 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		float Beta = 0.046f / Mor;
 		float Gamma = 0.000001f;
 
-		const AActor *HitActor = HitInfo.Actor.Get();
-		const FActorRegistry &Registry = GetEpisode().GetActorRegistry();
+		const AActor* HitActor = HitInfo.Actor.Get();
+		const FActorRegistry& Registry = GetEpisode().GetActorRegistry();
 		if (HitActor != nullptr)
 		{
-			const FCarlaActor *view = Registry.FindCarlaActor(HitActor);
+			const FCarlaActor* view = Registry.FindCarlaActor(HitActor);
 			if (view)
 			{
-				Detection.actor_type = static_cast<uint8_t>(view->GetActorType());
+				Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
 			}
 			Gamma = GetReflectanceFromHitResult(HitInfo) / std::pow(10, 5);
 		}
@@ -144,12 +144,12 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		std::string Key(buffer);
 
 		// R_tmp, i_soft
-		const std::vector<std::string> &Data = StepSizeData.at(Key);
+		const std::vector<std::string>& Data = StepSizeData.at(Key);
 		float StepDataDistance = std::stof(Data[0]);
 		float StepDataIntRec = std::stof(Data[1]);
 
 		// 公式(11)
-		StepDataIntRec = StepDataIntRec * OriginalIntesity * std::pow(Distance, 2.0) * Beta / Beta1;
+		StepDataIntRec = StepDataIntRec * OriginalIntensity * std::pow(Distance, 2.0) * Beta / Beta1;
 
 		// i_soft
 		if (StepDataIntRec > 255)
@@ -178,9 +178,10 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	}
 	else
 	{
-		Detection.intensity = static_cast<int>(OriginalIntesity);
+		Detection.intensity = OriginalIntensity;
 	}
 	Detection.point.y *= -1;
+	Detection.original_intensity = OriginalIntensity;
 	Detection.is_modified = is_modified;
 	return Detection;
 }
@@ -198,7 +199,7 @@ void ARayCastLidarWithFog::PreprocessRays(uint32_t Channels, uint32_t MaxPointsP
 	}
 }
 
-bool ARayCastLidarWithFog::PostprocessDetection(FDetection &Detection) const
+bool ARayCastLidarWithFog::PostprocessDetection(FDetection& Detection) const
 {
 	if (Description.NoiseStdDev > std::numeric_limits<float>::epsilon())
 	{
@@ -214,7 +215,7 @@ bool ARayCastLidarWithFog::PostprocessDetection(FDetection &Detection) const
 		return RandomEngine->GetUniformFloat() < DropOffAlpha * Intensity + DropOffBeta;
 }
 
-void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform &SensorTransform)
+void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform& SensorTransform)
 {
 	for (auto idxChannel = 0u; idxChannel < Description.Channels; ++idxChannel)
 		PointsPerChannel[idxChannel] = RecordedHits[idxChannel].size();
@@ -223,7 +224,7 @@ void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform &SensorTran
 
 	for (auto idxChannel = 0u; idxChannel < Description.Channels; ++idxChannel)
 	{
-		for (auto &hit : RecordedHits[idxChannel])
+		for (auto& hit : RecordedHits[idxChannel])
 		{
 			FDetection Detection = ComputeDetection(hit, SensorTransform);
 			if (PostprocessDetection(Detection))
@@ -235,7 +236,7 @@ void ARayCastLidarWithFog::ComputeAndSaveDetections(const FTransform &SensorTran
 
 	LidarData.WriteChannelCount(PointsPerChannel);
 }
-std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string &Input, char Delimiter) const
+std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string& Input, char Delimiter) const
 {
 	std::vector<std::string> Tokens;
 	size_t Start = 0;
@@ -254,7 +255,8 @@ std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string &In
 }
 void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 {
-	std::string FilePath = "D:\\carla\\data\\";
+	//std::string FilePath = "/home/ak/data/";
+	std::string FilePath = GetPathSeparator();
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
 	std::string FullPath = FilePath + FileName;
 
@@ -277,7 +279,7 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 		// 输出每一行内容
 		Temp = SplitString(Line, ':');
 		Temp1 = SplitString(Temp[1], ',');
-		StepSizeData[Temp[0]] = {Temp1[0], Temp1[1]};
+		StepSizeData[Temp[0]] = { Temp1[0], Temp1[1] };
 	}
 
 	// 关闭文件
@@ -321,13 +323,13 @@ std::string ARayCastLidarWithFog::GetAlphaByFogDensity(float FogDensity) const
 	return "0.005";
 }
 
-float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult &HitResult) const
+float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult& HitResult) const
 {
 	TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
 	float Reflectance = 0.1f;
 	if (HitComponent != nullptr)
 	{
-		UMaterialInterface *Material = HitComponent->GetMaterial(HitResult.FaceIndex);
+		UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
 		if (Material != nullptr)
 		{
 			float Roughness = 0.01;
@@ -344,4 +346,11 @@ float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult &HitRes
 		Reflectance = 0.99f;
 	}
 	return Reflectance;
+}
+std::string ARayCastLidarWithFog::GetPathSeparator() const {
+#ifdef _WIN32
+	return "D:\\carla\\data\\";
+#else
+	return "/home/ak/data/";
+#endif
 }

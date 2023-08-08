@@ -1190,10 +1190,13 @@ class CameraManager(object):
             return
         if self.sensors[self.index][0].startswith('sensor.lidar'):
             points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
+            num = 0
             for detection in image:
-                print(detection)
-                print('-------------------')
-            points = np.reshape(points, (int(points.shape[0] / 6), 6))
+                if(detection.is_modified == 1):
+                    num+=1
+            print(num)
+            print('-------------------')
+            points = np.reshape(points, (int(points.shape[0] / 7), 7))
             lidar_data = np.array(points[:, :2])
             lidar_data *= min(self.hud.dim) / (2.0 * self.lidar_range)
             lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])

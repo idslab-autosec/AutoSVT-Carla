@@ -54,6 +54,8 @@ private:
 
 	float GetReflectanceFromHitResult(const FHitResult& HitResult) const;
 
+	std::string GetPathSeparator() const;
+
 	FLidarData LidarData;
 
 	/// Enable/Disable general dropoff of lidar points
