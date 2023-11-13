@@ -257,7 +257,7 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 {
 	std::string FilePath = GetPathSeparator();
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
-	std::string FullPath = FilePath + FileName;
+	std::string FullPath = FilePath +"/" + FileName;
 
 	// 打开文件
 	std::ifstream InputFile(FullPath);
@@ -347,9 +347,6 @@ float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult& HitRes
 	return Reflectance;
 }
 std::string ARayCastLidarWithFog::GetPathSeparator() const {
-#ifdef _WIN32
-	return "D:\\carla\\data\\";
-#else
-	return "/home/ak/data/";
-#endif
+	FString CombinedPath = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Weather/Fog_data"));
+	return TCHAR_TO_UTF8(*CombinedPath);
 }
