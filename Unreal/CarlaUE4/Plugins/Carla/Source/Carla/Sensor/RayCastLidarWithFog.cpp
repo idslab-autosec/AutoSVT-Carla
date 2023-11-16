@@ -95,7 +95,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	float OriginalIntensity = static_cast<uint32_t>(AbsAtm * 255);
 
 	FWeatherParameters weather = GetEpisode().GetWeather()->GetCurrentWeather();
-	uint32_t is_modified = 0;
+	// uint32_t is_modified = 0;
 	float FogDensity = weather.FogDensity;
 	const std::string AlphaKey = GetAlphaByFogDensity(FogDensity);
 
@@ -107,7 +107,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	{
 		FogDensity = 100;
 	}
-	// 如果雾浓度发生变化 重新读取数据文件
+	// Fog density changed. Reload file.
 	if (CacheAlpha != AlphaKey)
 	{
 		GetStepSizeData(AlphaKey);
@@ -148,7 +148,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		float StepDataDistance = std::stof(Data[0]);
 		float StepDataIntRec = std::stof(Data[1]);
 
-		// 公式(11)
+		// eq(11)
 		StepDataIntRec = StepDataIntRec * OriginalIntensity * std::pow(Distance, 2.0) * Beta / Beta1;
 
 		// i_soft
@@ -158,31 +158,30 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		}
 
 		Detection.intensity = HardIntRec;
-		// 公式(12)
+		// eq(12)
 		if (StepDataIntRec > HardIntRec)
 		{
-			// todo  增加修改标记 fog_mask
-			float ScalingFactor = StepDataDistance / Distance; // 公式(13)
+			float ScalingFactor = StepDataDistance / Distance; // eq(13)
 			// noise
 			float Noise = 10.0f;
 			float DistanceNoise = RandomEngine->GetUniformFloatInRange(Distance - Noise, Distance + Noise);
 			float NoiseFactor = Distance / DistanceNoise;
 			float TotalScaling = ScalingFactor * NoiseFactor;
 
-			Detection.point.x *= TotalScaling; // 公式(16)
-			Detection.point.y *= TotalScaling; // 公式(17)
-			Detection.point.z *= TotalScaling; // 公式(18)
+			Detection.point.x *= TotalScaling; // eq(16)
+			Detection.point.y *= TotalScaling; // eq(17)
+			Detection.point.z *= TotalScaling; // eq(18)
 			Detection.intensity = StepDataIntRec;
-			is_modified = 1;
+			// is_modified = 1;
 		}
 	}
 	else
 	{
 		Detection.intensity = OriginalIntensity;
 	}
-	Detection.point.y *= -1;
-	Detection.original_intensity = OriginalIntensity;
-	Detection.is_modified = is_modified;
+	// Detection.point.y *= -1;
+	// Detection.original_intensity = OriginalIntensity;
+	// Detection.is_modified = is_modified;
 	return Detection;
 }
 
@@ -264,10 +263,9 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 
 	if (!InputFile.is_open())
 	{
-		std::cout << "无法打开文件：" << FullPath << std::endl;
+		std::cout << "Unable to open file: " << FullPath << std::endl;
 	}
 
-	// 逐行读取文件内容
 	std::string Line;
 
 	std::vector<std::string> Temp;
@@ -275,13 +273,11 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 
 	while (getline(InputFile, Line))
 	{
-		// 输出每一行内容
 		Temp = SplitString(Line, ':');
 		Temp1 = SplitString(Temp[1], ',');
 		StepSizeData[Temp[0]] = { Temp1[0], Temp1[1] };
 	}
 
-	// 关闭文件
 	InputFile.close();
 }
 
