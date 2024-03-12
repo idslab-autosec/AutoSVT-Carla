@@ -169,9 +169,6 @@ namespace data {
         << ", y=" << std::to_string(det.point.y)
         << ", z=" << std::to_string(det.point.z)
         << ", intensity=" << std::to_string(det.intensity)
-        << ", original_intensity=" << std::to_string(det.original_intensity)
-        << ", is_modified=" << std::to_string(det.is_modified)
-        << ", actor_type=" << std::to_string(det.actor_type)
         << ')';
     return out;
   }
@@ -577,9 +574,6 @@ void export_sensor_data() {
   class_<csd::LidarWithFogDetection>("LidarWithFogDetection")
     .def_readwrite("point", &csd::LidarWithFogDetection::point)
     .def_readwrite("intensity", &csd::LidarWithFogDetection::intensity)
-    .def_readwrite("original_intensity", &csd::LidarWithFogDetection::original_intensity)
-    .def_readwrite("is_modified", &csd::LidarWithFogDetection::is_modified)
-    .def_readwrite("actor_type", &csd::LidarWithFogDetection::actor_type)
     .def(self_ns::str(self_ns::self))
   ;
 

@@ -6,6 +6,7 @@
 
 #pragma once
 
+
 #include "Carla/Actor/ActorDefinition.h"
 #include "Carla/Sensor/LidarDescription.h"
 #include "Carla/Sensor/Sensor.h"
@@ -24,7 +25,7 @@ class CARLA_API ARayCastLidarWithFog : public ARayCastSemanticLidar
 {
 	GENERATED_BODY()
 
-		using FLidarData = carla::sensor::data::LidarWithFogData;
+	using FLidarData = carla::sensor::data::LidarWithFogData;
 	using FDetection = carla::sensor::data::LidarWithFogDetection;
 
 public:
@@ -52,7 +53,7 @@ private:
 
 	std::string GetAlphaByFogDensity(float FogDensity) const;
 
-	float GetReflectanceFromHitResult(const FHitResult& HitResult) const;
+	float GetReflectivityFromHitResult(const FHitResult& HitResult) const;
 
 	std::string GetPathSeparator() const;
 

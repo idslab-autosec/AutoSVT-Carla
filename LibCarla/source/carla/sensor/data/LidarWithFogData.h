@@ -53,28 +53,25 @@ namespace carla
       public:
         geom::Location point;
         uint32_t intensity;
-        uint32_t original_intensity;
-        uint32_t is_modified;
-        uint32_t actor_type;
+        // uint32_t original_intensity;
+        // uint32_t is_modified;
+        // uint32_t actor_type;
 
-        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0}, original_intensity{0}, is_modified{0}, actor_type{0} {}
-        LidarWithFogDetection(float x, float y, float z, uint32_t intensity, uint32_t original_intensity, uint32_t is_modified, uint32_t actor_type) : point(x, y, z), intensity{intensity}, original_intensity{original_intensity}, is_modified{is_modified}, actor_type{actor_type} {}
-        LidarWithFogDetection(geom::Location p, uint32_t intensity, uint32_t original_intensity, uint32_t is_modified, uint32_t actor_type) : point(p), intensity{intensity}, original_intensity{original_intensity}, is_modified{is_modified}, actor_type{actor_type} {}
+        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0} { }
+        LidarWithFogDetection(float x, float y, float z, uint32_t intensity) : point(x, y, z), intensity{intensity} { }
+        LidarWithFogDetection(geom::Location p, uint32_t intensity) : point(p), intensity{intensity} { }
 
         void WritePlyHeaderInfo(std::ostream &out) const
         {
-          out << "property float32 x\n"
-                 "property float32 y\n"
-                 "property float32 z\n"
-                 "property uint32_t I\n"
-                 "property uint32_t M\n"
-                 "property uint32_t T\n";
+          out << "property float32 x\n" \
+                 "property float32 y\n" \
+                 "property float32 z\n" \
+                 "property uint32_t I";
         }
 
         void WriteDetection(std::ostream &out) const
         {
-          out << point.x << ' ' << point.y << ' ' << point.z << ' '
-              << intensity << ' ' << intensity << ' ' << original_intensity << ' ' << actor_type;
+          out << point.x << ' ' << point.y << ' ' << point.z << ' ' << intensity;
         }
       };
 #pragma pack(pop)
@@ -109,6 +106,22 @@ namespace carla
         {
           _points.emplace_back(detection);
         }
+        // virtual void ResetMemory(std::vector<uint32_t> points_per_channel)
+        // {
+        //   DEBUG_ASSERT(GetChannelCount() > points_per_channel.size());
+        //   std::memset(_header.data() + Index::SIZE, 0, sizeof(uint32_t) * GetChannelCount());
+
+        //   uint32_t total_points = static_cast<uint32_t>(
+        //       std::accumulate(points_per_channel.begin(), points_per_channel.end(), 0));
+
+        //   _points.clear();
+        //   _points.reserve(total_points);
+        // }
+
+        // void WritePointSync(LidarWithFogDetection &detection)
+        // {
+        //   _points.emplace_back(detection);
+        // }
 
         virtual void WritePointSync(SemanticLidarDetection &detection)
         {

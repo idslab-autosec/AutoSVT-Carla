@@ -95,7 +95,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	float OriginalIntensity = static_cast<uint32_t>(AbsAtm * 255);
 
 	FWeatherParameters weather = GetEpisode().GetWeather()->GetCurrentWeather();
-	uint32_t is_modified = 0;
+	// uint32_t is_modified = 0;
 	float FogDensity = weather.FogDensity;
 	const std::string AlphaKey = GetAlphaByFogDensity(FogDensity);
 
@@ -130,11 +130,11 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		if (HitActor != nullptr)
 		{
 			const FCarlaActor* view = Registry.FindCarlaActor(HitActor);
-			if (view)
-			{
-				Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
-			}
-			Gamma = GetReflectanceFromHitResult(HitInfo) / std::pow(10, 5);
+			// if (view)
+			// {
+			// 	Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
+			// }
+			Gamma = GetReflectivityFromHitResult(HitInfo) / std::pow(10, 5);
 		}
 
 		float Beta1 = Gamma / M_PI;
@@ -173,7 +173,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			Detection.point.y *= TotalScaling; // 公式(17)
 			Detection.point.z *= TotalScaling; // 公式(18)
 			Detection.intensity = StepDataIntRec;
-			is_modified = 1;
+			// is_modified = 1;
 		}
 	}
 	else
@@ -181,8 +181,8 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		Detection.intensity = OriginalIntensity;
 	}
 	Detection.point.y *= -1;
-	Detection.original_intensity = OriginalIntensity;
-	Detection.is_modified = is_modified;
+	// Detection.original_intensity = OriginalIntensity;
+	// Detection.is_modified = is_modified;
 	return Detection;
 }
 
@@ -264,7 +264,7 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 
 	if (!InputFile.is_open())
 	{
-		std::cout << "无法打开文件：" << FullPath << std::endl;
+		std::cout << "Can not open file: " << FullPath << std::endl;
 	}
 
 	// 逐行读取文件内容
@@ -322,10 +322,10 @@ std::string ARayCastLidarWithFog::GetAlphaByFogDensity(float FogDensity) const
 	return "0.005";
 }
 
-float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult& HitResult) const
+float ARayCastLidarWithFog::GetReflectivityFromHitResult(const FHitResult& HitResult) const
 {
 	TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
-	float Reflectance = 0.1f;
+	float Reflectivity = 0.1f;
 	if (HitComponent != nullptr)
 	{
 		UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
@@ -333,18 +333,18 @@ float ARayCastLidarWithFog::GetReflectanceFromHitResult(const FHitResult& HitRes
 		{
 			float Roughness = 0.01;
 			Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
-			Reflectance = std::pow(1 - std::sqrt(1 - Roughness), 5);
+			Reflectivity = std::pow(1 - std::sqrt(1 - Roughness), 5);
 		}
 	}
-	if (Reflectance < 0.01f)
+	if (Reflectivity < 0.01f)
 	{
-		Reflectance = 0.01f;
+		Reflectivity = 0.01f;
 	}
-	else if (Reflectance >= 1)
+	else if (Reflectivity >= 1)
 	{
-		Reflectance = 0.99f;
+		Reflectivity = 0.99f;
 	}
-	return Reflectance;
+	return Reflectivity;
 }
 std::string ARayCastLidarWithFog::GetPathSeparator() const {
 	FString CombinedPath = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Weather/Fog_data"));
