@@ -3,6 +3,7 @@
 //
 // This work is licensed under the terms of the MIT license.
 // For a copy, see <https://opensource.org/licenses/MIT>.
+
 #include <PxScene.h>
 #include <cmath>
 #include "Carla.h"
@@ -68,22 +69,23 @@ void ARayCastLidarWithFog::PostPhysTick(UWorld* World, ELevelTick TickType, floa
 	}
 }
 
-float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection& RawDetection) const
-{
-	const carla::geom::Location HitPoint = RawDetection.point;
-	const float Distance = HitPoint.Length();
+// float ARayCastLidarWithFog::ComputeIntensity(const FSemanticDetection& RawDetection) const
+// {
+// 	const carla::geom::Location HitPoint = RawDetection.point;
+// 	const float Distance = HitPoint.Length();
 
-	const float AttenAtm = Description.AtmospAttenRate;
-	const float AbsAtm = exp(-AttenAtm * Distance);
+// 	const float AttenAtm = Description.AtmospAttenRate;
+// 	const float AbsAtm = exp(-AttenAtm * Distance);
 
-	const float IntRec = AbsAtm;
+// 	const float IntRec = AbsAtm;
 
-	return IntRec;
-}
+// 	return IntRec;
+// }
 
 ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const
 {
 	FDetection Detection;
+
 	const FVector HitPoint = HitInfo.ImpactPoint;
 	Detection.point = SensorTransf.Inverse().TransformPosition(HitPoint);
 
@@ -107,12 +109,15 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	{
 		FogDensity = 100;
 	}
-	// 如果雾浓度发生变化 重新读取数据文件
+
+
+	// Fog density changed
 	if (CacheAlpha != AlphaKey)
 	{
 		GetStepSizeData(AlphaKey);
 		CacheAlpha = AlphaKey;
 	}
+
 	if (FogDensity > 0)
 	{
 		// hard
@@ -137,7 +142,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			Gamma = GetReflectivityFromHitResult(HitInfo) / std::pow(10, 5);
 		}
 
-		float Beta1 = Gamma / M_PI;
+		float Beta0 = Gamma / M_PI;
 		float RoundedIntRec = static_cast<int>(std::round(Distance * 10)) / 10.0;
 		char buffer[20];
 		std::snprintf(buffer, sizeof(buffer), "%.1f", RoundedIntRec);
@@ -148,8 +153,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		float StepDataDistance = std::stof(Data[0]);
 		float StepDataIntRec = std::stof(Data[1]);
 
-		// 公式(11)
-		StepDataIntRec = StepDataIntRec * OriginalIntensity * std::pow(Distance, 2.0) * Beta / Beta1;
+		StepDataIntRec = StepDataIntRec * OriginalIntensity * std::pow(Distance, 2.0) * Beta / Beta0;
 
 		// i_soft
 		if (StepDataIntRec > 255)
@@ -158,20 +162,19 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		}
 
 		Detection.intensity = HardIntRec;
-		// 公式(12)
+
 		if (StepDataIntRec > HardIntRec)
 		{
-			// todo  增加修改标记 fog_mask
-			float ScalingFactor = StepDataDistance / Distance; // 公式(13)
+			float ScalingFactor = StepDataDistance / Distance;
 			// noise
 			float Noise = 10.0f;
 			float DistanceNoise = RandomEngine->GetUniformFloatInRange(Distance - Noise, Distance + Noise);
 			float NoiseFactor = Distance / DistanceNoise;
 			float TotalScaling = ScalingFactor * NoiseFactor;
 
-			Detection.point.x *= TotalScaling; // 公式(16)
-			Detection.point.y *= TotalScaling; // 公式(17)
-			Detection.point.z *= TotalScaling; // 公式(18)
+			Detection.point.x *= TotalScaling;
+			Detection.point.y *= TotalScaling;
+			Detection.point.z *= TotalScaling;
 			Detection.intensity = StepDataIntRec;
 			// is_modified = 1;
 		}
@@ -183,6 +186,7 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 	Detection.point.y *= -1;
 	// Detection.original_intensity = OriginalIntensity;
 	// Detection.is_modified = is_modified;
+
 	return Detection;
 }
 
@@ -209,6 +213,7 @@ bool ARayCastLidarWithFog::PostprocessDetection(FDetection& Detection) const
 	}
 
 	const float Intensity = Detection.intensity / 255;
+	// const float Intensity = Detection.intensity;
 	if (Intensity > Description.DropOffIntensityLimit)
 		return true;
 	else
@@ -257,9 +262,8 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 {
 	std::string FilePath = GetPathSeparator();
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
-	std::string FullPath = FilePath +"/" + FileName;
+	std::string FullPath = FilePath + "/" + FileName;
 
-	// 打开文件
 	std::ifstream InputFile(FullPath);
 
 	if (!InputFile.is_open())
@@ -267,21 +271,17 @@ void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
 		std::cout << "Can not open file: " << FullPath << std::endl;
 	}
 
-	// 逐行读取文件内容
 	std::string Line;
-
 	std::vector<std::string> Temp;
 	std::vector<std::string> Temp1;
 
 	while (getline(InputFile, Line))
 	{
-		// 输出每一行内容
 		Temp = SplitString(Line, ':');
 		Temp1 = SplitString(Temp[1], ',');
 		StepSizeData[Temp[0]] = { Temp1[0], Temp1[1] };
 	}
 
-	// 关闭文件
 	InputFile.close();
 }
 
@@ -347,6 +347,6 @@ float ARayCastLidarWithFog::GetReflectivityFromHitResult(const FHitResult& HitRe
 	return Reflectivity;
 }
 std::string ARayCastLidarWithFog::GetPathSeparator() const {
-	FString CombinedPath = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Weather/Fog_data"));
+	FString CombinedPath = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Weather/FogData"));
 	return TCHAR_TO_UTF8(*CombinedPath);
 }

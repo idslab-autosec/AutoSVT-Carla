@@ -22,7 +22,8 @@ namespace carla
       /// some extra meta-information about the LidarWithFog.
       class LidarWithFogMeasurement : public Array<data::LidarWithFogDetection>
       {
-        static_assert(sizeof(data::LidarWithFogDetection) == 3u * sizeof(float) + 4u * sizeof(uint32_t), "Location size missmatch");
+        // static_assert(sizeof(data::LidarWithFogDetection) == 3u * sizeof(float) + 4u * sizeof(uint32_t), "Location size missmatch");
+        static_assert(sizeof(data::LidarWithFogDetection) == 4u * sizeof(float), "Location size missmatch");
         using Super = Array<data::LidarWithFogDetection>;
 
       protected:

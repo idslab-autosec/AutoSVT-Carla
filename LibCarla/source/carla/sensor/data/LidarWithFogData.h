@@ -52,21 +52,21 @@ namespace carla
       {
       public:
         geom::Location point;
-        uint32_t intensity;
+        float intensity;
         // uint32_t original_intensity;
         // uint32_t is_modified;
         // uint32_t actor_type;
 
-        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0} { }
-        LidarWithFogDetection(float x, float y, float z, uint32_t intensity) : point(x, y, z), intensity{intensity} { }
-        LidarWithFogDetection(geom::Location p, uint32_t intensity) : point(p), intensity{intensity} { }
+        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0.0f} { }
+        LidarWithFogDetection(float x, float y, float z, float intensity) : point(x, y, z), intensity{intensity} { }
+        LidarWithFogDetection(geom::Location p, float intensity) : point(p), intensity{intensity} { }
 
         void WritePlyHeaderInfo(std::ostream &out) const
         {
           out << "property float32 x\n" \
                  "property float32 y\n" \
                  "property float32 z\n" \
-                 "property uint32_t I";
+                 "property float32 I";
         }
 
         void WriteDetection(std::ostream &out) const
@@ -78,7 +78,6 @@ namespace carla
 
       class LidarWithFogData : public SemanticLidarData
       {
-        static_assert(sizeof(float) == sizeof(uint32_t), "Invalid float size");
 
       public:
         explicit LidarWithFogData(uint32_t ChannelCount = 0u)
@@ -99,29 +98,16 @@ namespace carla
               std::accumulate(points_per_channel.begin(), points_per_channel.end(), 0));
 
           _points.clear();
-          _points.reserve(total_points);
+          _points.reserve(total_points * 4);
         }
 
         void WritePointSync(LidarWithFogDetection &detection)
         {
-          _points.emplace_back(detection);
+          _points.emplace_back(detection.point.x);
+          _points.emplace_back(detection.point.y);
+          _points.emplace_back(detection.point.z);
+          _points.emplace_back(detection.intensity);
         }
-        // virtual void ResetMemory(std::vector<uint32_t> points_per_channel)
-        // {
-        //   DEBUG_ASSERT(GetChannelCount() > points_per_channel.size());
-        //   std::memset(_header.data() + Index::SIZE, 0, sizeof(uint32_t) * GetChannelCount());
-
-        //   uint32_t total_points = static_cast<uint32_t>(
-        //       std::accumulate(points_per_channel.begin(), points_per_channel.end(), 0));
-
-        //   _points.clear();
-        //   _points.reserve(total_points);
-        // }
-
-        // void WritePointSync(LidarWithFogDetection &detection)
-        // {
-        //   _points.emplace_back(detection);
-        // }
 
         virtual void WritePointSync(SemanticLidarDetection &detection)
         {
@@ -130,7 +116,7 @@ namespace carla
         }
 
       private:
-        std::vector<LidarWithFogDetection> _points;
+        std::vector<float> _points;
 
         friend class s11n::LidarWithFogSerializer;
         friend class s11n::LidarWithFogHeaderView;
