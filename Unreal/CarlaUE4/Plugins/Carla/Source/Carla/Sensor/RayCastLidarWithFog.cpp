@@ -140,8 +140,14 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			// 	Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
 			// }
 			Gamma = GetReflectivityFromHitResult(HitInfo) / std::pow(10, 5);
-		}
 
+			// begin debug
+			// std::string DebugFilePath = GetPathSeparator() + "/debug.log";
+			// std::ofstream outputFile(DebugFilePath, std::ios::app);
+			// outputFile << "Gamma=" << Gamma << std::endl;
+			// end debug
+		}
+		
 		float Beta0 = Gamma / M_PI;
 		float RoundedIntRec = static_cast<int>(std::round(Distance * 10)) / 10.0;
 		char buffer[20];
@@ -335,6 +341,12 @@ float ARayCastLidarWithFog::GetReflectivityFromHitResult(const FHitResult& HitRe
 			Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
 			Reflectivity = std::pow(1 - std::sqrt(1 - Roughness), 5);
 		}
+
+		// begin debug
+		std::string DebugFilePath = GetPathSeparator() + "/debug.log";
+		std::ofstream outputFile(DebugFilePath, std::ios::app);
+		outputFile << "Roughness=" << Roughness << ", Reflectivity=" << Reflectivity << std::endl;
+		// end debug
 	}
 	if (Reflectivity < 0.01f)
 	{
