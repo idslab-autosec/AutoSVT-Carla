@@ -140,12 +140,6 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			// 	Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
 			// }
 			Gamma = GetReflectivityFromHitResult(HitInfo) / std::pow(10, 5);
-
-			// begin debug
-			// std::string DebugFilePath = GetPathSeparator() + "/debug.log";
-			// std::ofstream outputFile(DebugFilePath, std::ios::app);
-			// outputFile << "Gamma=" << Gamma << std::endl;
-			// end debug
 		}
 		
 		float Beta0 = Gamma / M_PI;
@@ -328,25 +322,50 @@ std::string ARayCastLidarWithFog::GetAlphaByFogDensity(float FogDensity) const
 	return "0.005";
 }
 
+TSet<FString> UniqueLabels; // debug
+
 float ARayCastLidarWithFog::GetReflectivityFromHitResult(const FHitResult& HitResult) const
 {
-	TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
-	float Reflectivity = 0.1f;
-	if (HitComponent != nullptr)
+	// TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
+	UPrimitiveComponent* HitComponent = HitResult.GetComponent();
+	AActor* HitActor = HitResult.GetActor();
+	FString ActorLabel = HitActor->GetActorLabel();
+	if (!UniqueLabels.Contains(ActorLabel))
 	{
-		UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
-		if (Material != nullptr)
-		{
-			float Roughness = 0.01;
-			Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
-			Reflectivity = std::pow(1 - std::sqrt(1 - Roughness), 5);
-		}
+		UniqueLabels.Add(ActorLabel);
+		UE_LOG(LogTemp, Warning, TEXT("New Label: %s"), *ActorLabel);
+	}
+	float Reflectivity = 0.1f;
 
-		// begin debug
-		std::string DebugFilePath = GetPathSeparator() + "/debug.log";
-		std::ofstream outputFile(DebugFilePath, std::ios::app);
-		outputFile << "Roughness=" << Roughness << ", Reflectivity=" << Reflectivity << std::endl;
-		// end debug
+	if (HitComponent != nullptr)
+	{	
+		// int32 NumHitMaterials = HitComponent->GetNumMaterials();
+		// UE_LOG(LogTemp, Warning, TEXT("NumHitMaterials = %d"), NumHitMaterials);
+
+		// UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
+		// UMaterialInterface* Material = HitComponent->GetMaterial(0);
+		// UMaterial* BaseMaterial = Material->GetBaseMaterial();
+		// TArray<FMaterialParameterInfo> ParameterInfoArray;
+		// TArray<FGuid> ParameterIdsArray;
+
+		// Material->GetAllScalarParameterInfo(ParameterInfoArray, ParameterIdsArray);
+		// // BaseMaterial->GetAllParameterInfo(ParameterInfoArray, ParameterIdsArray, nullptr);
+
+		// for (int32 Index = 0; Index < ParameterInfoArray.Num(); ++Index)
+		// {
+		// 	const FMaterialParameterInfo& ParamInfo = ParameterInfoArray[Index];
+		// 	float ParamValue;
+		// 	Material->GetScalarParameterValue(FHashedMaterialParameterInfo(*ParamInfo.Name.ToString()), ParamValue, true);
+		// 	UE_LOG(LogTemp, Warning, TEXT("Parameter %d: Name = %s, Value = %f"), Index, *ParamInfo.Name.ToString(), ParamValue);
+		// }
+
+		// if (Material != nullptr)
+		// {
+		// 	// FName MaterialName = Material->GetFName();// debug
+		// 	float Roughness = 0.01;
+		// 	Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
+		// 	Reflectivity = std::pow(1 - std::sqrt(1 - Roughness), 5);
+		// }
 	}
 	if (Reflectivity < 0.01f)
 	{
