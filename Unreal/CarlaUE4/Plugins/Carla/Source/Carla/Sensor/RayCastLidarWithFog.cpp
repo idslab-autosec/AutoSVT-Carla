@@ -6,6 +6,7 @@
 
 #include <PxScene.h>
 #include <cmath>
+#include <vector>
 #include "Carla.h"
 #include "Carla/Sensor/RayCastLidarWithFog.h"
 #include "Carla/Actor/ActorBlueprintFunctionLibrary.h"
@@ -82,25 +83,32 @@ void ARayCastLidarWithFog::PostPhysTick(UWorld* World, ELevelTick TickType, floa
 // 	return IntRec;
 // }
 
-ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const
+ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf)
 {
 	FDetection Detection;
-
+	Detection.object_tag = 0;
 	const FVector HitPoint = HitInfo.ImpactPoint;
 	Detection.point = SensorTransf.Inverse().TransformPosition(HitPoint);
-
 	const float Distance = Detection.point.Length();
 
-	const float AttenAtm = Description.AtmospAttenRate;
-	const float AbsAtm = exp(-AttenAtm * Distance);
+	// const float AttenAtm = Description.AtmospAttenRate;
+	// const float AbsAtm = exp(-AttenAtm * Distance);
+	// float OriginalIntensity = static_cast<uint32_t>(AbsAtm * 255);
+	
 
-	float OriginalIntensity = static_cast<uint32_t>(AbsAtm * 255);
+	// Get reflectivity
+	float Gamma = 0.0000021f;
+	// float Gamma = 0.21f;
+	const FActorRegistry& Registry = GetEpisode().GetActorRegistry();
+	Detection.object_tag = static_cast<uint32_t>(HitInfo.Component->CustomDepthStencilValue);
+	Gamma = GetReflectivity(Detection.object_tag) / std::pow(10, 5);
+
+	float Beta0 = Gamma / M_PI;
+	float OriginalIntensity = 5e9; // C_A P_0
 
 	FWeatherParameters weather = GetEpisode().GetWeather()->GetCurrentWeather();
-	// uint32_t is_modified = 0;
 	float FogDensity = weather.FogDensity;
-	const std::string AlphaKey = GetAlphaByFogDensity(FogDensity);
-
+	
 	if (FogDensity < 0)
 	{
 		FogDensity = 0;
@@ -110,60 +118,46 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 		FogDensity = 100;
 	}
 
-
 	// Fog density changed
-	if (CacheAlpha != AlphaKey)
+	if (CurrentFogDensity != FogDensity || isinf(Alpha))
 	{
-		GetStepSizeData(AlphaKey);
-		CacheAlpha = AlphaKey;
+		CurrentFogDensity = FogDensity;
+		GetStepSizeData(CurrentFogDensity);
+		Mor = CalculateMOR(FogDensity);
+		Alpha = std::log(20) / Mor;
+		Beta = 0.046f / Mor;
+	}
+	if (FogDensity == 0)
+	{
+		// Suppose MOR = 10km in clear weather
+		Alpha = 0.000229f; 
+		Beta = 0.0000046f;
 	}
 
 	if (FogDensity > 0)
 	{
-		// hard
-		float Alpha = std::stof(AlphaKey);
-		float HardIntRec = std::round(exp(-2 * Alpha * Distance) * OriginalIntensity);
-
-		// soft
-		// ParameterSet
-		float Mor = std::log(20) / Alpha;
-		float Beta = 0.046f / Mor;
-		float Gamma = 0.000001f;
-
-		const AActor* HitActor = HitInfo.Actor.Get();
-		const FActorRegistry& Registry = GetEpisode().GetActorRegistry();
-		if (HitActor != nullptr)
-		{
-			const FCarlaActor* view = Registry.FindCarlaActor(HitActor);
-			// if (view)
-			// {
-			// 	Detection.actor_type = static_cast<uint32_t>(view->GetActorType());
-			// }
-			Gamma = GetReflectivityFromHitResult(HitInfo) / std::pow(10, 5);
-		}
-		
-		float Beta0 = Gamma / M_PI;
-		float RoundedIntRec = static_cast<int>(std::round(Distance * 10)) / 10.0;
+		// Hard
+		float Hard = OriginalIntensity * Beta0 / std::pow(Distance, 2.0) * exp(-2 * Alpha * Distance);
+		Hard = std::min(Hard, 255.0f);
+		// Soft
 		char buffer[20];
-		std::snprintf(buffer, sizeof(buffer), "%.1f", RoundedIntRec);
+		std::snprintf(buffer, sizeof(buffer), "%.1f", std::min(Distance, 200.0f));
 		std::string Key(buffer);
 
 		// R_tmp, i_soft
 		const std::vector<std::string>& Data = StepSizeData.at(Key);
 		float StepDataDistance = std::stof(Data[0]);
-		float StepDataIntRec = std::stof(Data[1]);
-
-		StepDataIntRec = StepDataIntRec * OriginalIntensity * std::pow(Distance, 2.0) * Beta / Beta0;
+		double Soft = std::stod(Data[1]); // max(Simpson), i.e., i_{tmp}
+		Soft = OriginalIntensity * Beta * Soft;
 
 		// i_soft
-		if (StepDataIntRec > 255)
+		if (Soft > 255)
 		{
-			StepDataIntRec = 255;
+			Soft = 255;
 		}
+		Detection.intensity = Hard;
 
-		Detection.intensity = HardIntRec;
-
-		if (StepDataIntRec > HardIntRec)
+		if (Soft > Hard)
 		{
 			float ScalingFactor = StepDataDistance / Distance;
 			// noise
@@ -175,18 +169,19 @@ ARayCastLidarWithFog::FDetection ARayCastLidarWithFog::ComputeDetection(const FH
 			Detection.point.x *= TotalScaling;
 			Detection.point.y *= TotalScaling;
 			Detection.point.z *= TotalScaling;
-			Detection.intensity = StepDataIntRec;
-			// is_modified = 1;
+			Detection.intensity = Soft;
+			Detection.object_tag = 29;
 		}
+		// UE_LOG(LogTemp, Warning, TEXT("FogDensity = %f, Mor = %f, Alpha = %f"), FogDensity, Mor, Alpha);
+		// UE_LOG(LogTemp, Warning, TEXT("soft_i = %f, hard_i = %f, object_tag = %d"), Soft, Hard, Detection.object_tag); 
 	}
 	else
-	{
-		Detection.intensity = OriginalIntensity;
+	{	
+		// clear weather
+		Detection.intensity = OriginalIntensity * Beta0 / std::pow(Distance, 2.0) * exp(-2 * Alpha * Distance);
 	}
-	Detection.point.y *= -1;
-	// Detection.original_intensity = OriginalIntensity;
-	// Detection.is_modified = is_modified;
-
+	Detection.point.y *= -1; // For Carla-Apollo-Bridge
+	// UE_LOG(LogTemp, Warning, TEXT("object_tag = %d"), Detection.object_tag); 
 	return Detection;
 }
 
@@ -258,126 +253,266 @@ std::vector<std::string> ARayCastLidarWithFog::SplitString(const std::string& In
 
 	return Tokens;
 }
-void ARayCastLidarWithFog::GetStepSizeData(std::string Alpha) const
+void ARayCastLidarWithFog::GetStepSizeData(float FogDensity) const
 {
+	std::string Alpha = GetAlphaInFileName(FogDensity);
 	std::string FilePath = GetPathSeparator();
 	std::string FileName = "integral_0m_to_200m_stepsize_0.1m_tau_h_20ns_alpha_" + Alpha + ".txt";
 	std::string FullPath = FilePath + "/" + FileName;
-
 	std::ifstream InputFile(FullPath);
-
-	if (!InputFile.is_open())
-	{
-		std::cout << "Can not open file: " << FullPath << std::endl;
-	}
 
 	std::string Line;
 	std::vector<std::string> Temp;
-	std::vector<std::string> Temp1;
+	std::vector<std::string> Data;
 
 	while (getline(InputFile, Line))
 	{
 		Temp = SplitString(Line, ':');
-		Temp1 = SplitString(Temp[1], ',');
-		StepSizeData[Temp[0]] = { Temp1[0], Temp1[1] };
+		Data = SplitString(Temp[1], ',');
+		StepSizeData[Temp[0]] = {Data[0], Data[1]};
 	}
 
 	InputFile.close();
 }
 
-std::string ARayCastLidarWithFog::GetAlphaByFogDensity(float FogDensity) const
+std::string ARayCastLidarWithFog::GetAlphaInFileName(float FogDensity) const
 {
-	if (FogDensity > 3 && FogDensity <= 10)
-	{
+	if (FogDensity <= 10) {
+		return "0.005";
+	}
+	else if (FogDensity <= 22) {
 		return "0.01";
 	}
-	else if (FogDensity > 10 && FogDensity <= 25)
-	{
+	else if (FogDensity <= 30.5) {
+		return "0.015";
+	}
+	else if (FogDensity <= 36.5) {
 		return "0.02";
 	}
-	else if (FogDensity > 25 && FogDensity <= 40)
-	{
+	else if (FogDensity <= 59) {
 		return "0.03";
 	}
-	else if (FogDensity > 40 && FogDensity <= 50)
-	{
+	else if (FogDensity <= 71) {
 		return "0.06";
 	}
-	else if (FogDensity > 50 && FogDensity <= 80)
-	{
+	else if (FogDensity <= 84) {
 		return "0.1";
 	}
-	else if (FogDensity > 80 && FogDensity <= 90)
-	{
-		return "0.12";
-	}
-	else if (FogDensity > 90 && FogDensity <= 95)
-	{
+	else if (FogDensity <= 92.5) {
 		return "0.15";
 	}
-	else if (FogDensity > 95)
-	{
+	else if (FogDensity <= 100) {
 		return "0.2";
 	}
-	return "0.005";
+	else {
+		return "0.005";
+	}
 }
 
-TSet<FString> UniqueLabels; // debug
 
-float ARayCastLidarWithFog::GetReflectivityFromHitResult(const FHitResult& HitResult) const
+float ARayCastLidarWithFog::PiecewiseLinearRegression(const std::vector<FogDensityDataPoint>& data, float x) const
 {
-	// TWeakObjectPtr<class UPrimitiveComponent> HitComponent = HitResult.Component.Get();
-	UPrimitiveComponent* HitComponent = HitResult.GetComponent();
-	AActor* HitActor = HitResult.GetActor();
-	FString ActorLabel = HitActor->GetActorLabel();
-	if (!UniqueLabels.Contains(ActorLabel))
-	{
-		UniqueLabels.Add(ActorLabel);
-		UE_LOG(LogTemp, Warning, TEXT("New Label: %s"), *ActorLabel);
-	}
-	float Reflectivity = 0.1f;
-
-	if (HitComponent != nullptr)
-	{	
-		// int32 NumHitMaterials = HitComponent->GetNumMaterials();
-		// UE_LOG(LogTemp, Warning, TEXT("NumHitMaterials = %d"), NumHitMaterials);
-
-		// UMaterialInterface* Material = HitComponent->GetMaterial(HitResult.FaceIndex);
-		// UMaterialInterface* Material = HitComponent->GetMaterial(0);
-		// UMaterial* BaseMaterial = Material->GetBaseMaterial();
-		// TArray<FMaterialParameterInfo> ParameterInfoArray;
-		// TArray<FGuid> ParameterIdsArray;
-
-		// Material->GetAllScalarParameterInfo(ParameterInfoArray, ParameterIdsArray);
-		// // BaseMaterial->GetAllParameterInfo(ParameterInfoArray, ParameterIdsArray, nullptr);
-
-		// for (int32 Index = 0; Index < ParameterInfoArray.Num(); ++Index)
-		// {
-		// 	const FMaterialParameterInfo& ParamInfo = ParameterInfoArray[Index];
-		// 	float ParamValue;
-		// 	Material->GetScalarParameterValue(FHashedMaterialParameterInfo(*ParamInfo.Name.ToString()), ParamValue, true);
-		// 	UE_LOG(LogTemp, Warning, TEXT("Parameter %d: Name = %s, Value = %f"), Index, *ParamInfo.Name.ToString(), ParamValue);
-		// }
-
-		// if (Material != nullptr)
-		// {
-		// 	// FName MaterialName = Material->GetFName();// debug
-		// 	float Roughness = 0.01;
-		// 	Material->GetScalarParameterValue(TEXT("Roughness"), Roughness);
-		// 	Reflectivity = std::pow(1 - std::sqrt(1 - Roughness), 5);
-		// }
-	}
-	if (Reflectivity < 0.01f)
-	{
-		Reflectivity = 0.01f;
-	}
-	else if (Reflectivity >= 1)
-	{
-		Reflectivity = 0.99f;
-	}
-	return Reflectivity;
+    for (size_t i = 1; i < data.size(); ++i) {
+        if (x >= data[i - 1].x && x < data[i].x) {
+            float slope = (data[i].y - data[i - 1].y) / (data[i].x - data[i - 1].x);
+            float y_intercept = data[i - 1].y - slope * data[i - 1].x;
+            return slope * x + y_intercept;
+        }
+    }
+    return 0.0;
 }
-std::string ARayCastLidarWithFog::GetPathSeparator() const {
+
+float ARayCastLidarWithFog::CalculateMOR(const float FogDensity) const
+{
+	std::vector<FogDensityDataPoint> FogDensityData = {
+        {2, 600},
+        {10, 300},
+        {15, 200},
+        {25, 150},
+        {40, 100},
+        {50, 50},
+        {80, 30},
+        {90, 25},
+        {95, 20},
+        {100, 15}
+    };
+	float NewMOR = PiecewiseLinearRegression(FogDensityData, FogDensity);
+	if (NewMOR <= 0) {
+		NewMOR = 10000;
+	}
+	return NewMOR;
+}
+
+// TSet<FString> UniqueLabels; // debug
+
+float ARayCastLidarWithFog::GetReflectivity(uint32_t ObjectTag) const
+{
+	// ObjectTag: https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
+	if (ObjectTag == 0) {
+		return 0.21f;
+	}
+	else if (ObjectTag == 1 || ObjectTag == 2) {
+		return 0.2f;
+	}
+	else if (ObjectTag == 3) {
+		return 0.32f;
+	}
+	else if (ObjectTag == 4) {
+		return 0.21f;
+	}
+	else if (ObjectTag == 5) {
+		return 0.24f;
+	}
+	else if (ObjectTag == 6) {
+		return 0.08f;
+	}
+	else if (ObjectTag == 8) {
+		return 0.37f;
+	}
+	else if (ObjectTag == 9) {
+		return 0.17f;
+	}
+	else if (ObjectTag == 10) {
+		return 0.19f;
+	}
+	else if (ObjectTag == 11) {
+		return 0.0f;
+	}
+	else if (ObjectTag == 12 || ObjectTag == 13) {
+		return 0.09f;
+	}
+	else if (ObjectTag == 14 || ObjectTag == 15 || ObjectTag == 16 || ObjectTag == 17) {
+		return 0.06f;
+	}
+	else if (ObjectTag == 18) {
+		return 0.08f;
+	}
+	else if (ObjectTag == 19) {
+		return 0.13f;
+	}
+	else if (ObjectTag == 23) {
+		return 0.06f;
+	}
+	else {
+		return 0.21;
+	}
+}
+
+float ARayCastLidarWithFog::LookupReflectivityTable(FString ActorLabel) const 
+{
+	if ( // terrain
+		ActorLabel.Contains(TEXT("grass")) || 
+		ActorLabel.Contains(TEXT("terrain"))
+	)
+	{
+		return 0.19f;
+	}
+
+	else if ( // road, sidewalk
+		ActorLabel.Contains(TEXT("block")) || 
+		ActorLabel.Contains(TEXT("Road_"), ESearchCase::CaseSensitive) || 
+		ActorLabel.Contains(TEXT("line"))
+	)
+	{
+		return 0.2f;
+	}
+
+	else if ( // building
+		ActorLabel.Contains(TEXT("apartment")) || 
+		ActorLabel.Contains(TEXT("house")) || 
+		ActorLabel.Contains(TEXT("office")) || 
+		ActorLabel.Contains(TEXT("staticmesh")) || 
+		ActorLabel.Contains(TEXT("concrete")) || 
+		ActorLabel.Contains(TEXT("skyscraper")) || 
+		ActorLabel.Contains(TEXT("mall")) ||
+		ActorLabel.Contains(TEXT("shop_"))
+	)
+	{
+		return 0.32f;
+	}
+
+	else if ( // parking
+		ActorLabel.Contains(TEXT("parking"))
+	)
+	{
+		return 0.1f;
+	}
+
+	else if ( // other-structure
+		ActorLabel.Contains(TEXT("SM_"), ESearchCase::CaseSensitive) || 
+		ActorLabel.Contains(TEXT("wall")) || 
+		ActorLabel.Contains(TEXT("sculpture")) || 
+		ActorLabel.Contains(TEXT("tunelentrance")) || 
+		ActorLabel.Contains(TEXT("_bin")) || 
+		ActorLabel.Contains(TEXT("barrel")) || 
+		ActorLabel.Contains(TEXT("lamppost")) || 
+		ActorLabel.Contains(TEXT("repspline"))
+	)
+	{
+		return 0.21f;
+	}
+
+	else if ( // fence
+		ActorLabel.Contains(TEXT("fence"))
+	)
+	{
+		return 0.24f;
+	}
+	
+	else if ( // pole
+		ActorLabel.Contains(TEXT("light"))
+	)
+	{
+		return 0.08f;
+	}
+
+	else if ( // traffic-sign
+		ActorLabel.Contains(TEXT("speedlimit"))
+	)
+	{
+		return 0.37f;
+	}
+
+	if ( // person
+		ActorLabel.Contains(TEXT("BP_Walker"), ESearchCase::CaseSensitive) || 
+		ActorLabel.Contains(TEXT("bush"))
+	)
+	{
+		return 0.09f;	
+	}
+
+	if ( // car, truck
+		ActorLabel.Contains(TEXT("BP_"), ESearchCase::CaseSensitive) || 
+		ActorLabel.Contains(TEXT("Vh_"), ESearchCase::CaseSensitive)
+	)
+	{
+		return 0.06f;	
+	}
+
+	else if ( // vegetation
+		ActorLabel.Contains(TEXT("leaf")) || 
+		ActorLabel.Contains(TEXT("pine")) || 
+		ActorLabel.Contains(TEXT("foliage")) || 
+		ActorLabel.Contains(TEXT("maple")) || 
+		ActorLabel.Contains(TEXT("palmera")) || 
+		ActorLabel.Contains(TEXT("platanus")) || 
+		ActorLabel.Contains(TEXT("sassafras")) || 
+		ActorLabel.Contains(TEXT("Veg_"), ESearchCase::CaseSensitive) ||
+		ActorLabel.Contains(TEXT("bush")) || 
+		ActorLabel.Contains(TEXT("leave"))
+	)
+	{
+		return 0.17f;	
+	}
+
+	else
+	{
+		return 0.21f;
+	}
+}
+
+std::string ARayCastLidarWithFog::GetPathSeparator() const 
+{
 	FString CombinedPath = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Weather/FogData"));
 	return TCHAR_TO_UTF8(*CombinedPath);
 }

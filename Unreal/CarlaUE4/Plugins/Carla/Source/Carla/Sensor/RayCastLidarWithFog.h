@@ -19,6 +19,11 @@
 
 #include "RayCastLidarWithFog.generated.h"
 
+struct FogDensityDataPoint {
+	float x;
+	float y;
+};
+
 /// A ray-cast based Lidar sensor.
 UCLASS()
 class CARLA_API ARayCastLidarWithFog : public ARayCastSemanticLidar
@@ -40,7 +45,7 @@ public:
 private:
 	/// Compute the received intensity of the point
 	float ComputeIntensity(const FSemanticDetection& RawDetection) const;
-	FDetection ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf) const;
+	FDetection ComputeDetection(const FHitResult& HitInfo, const FTransform& SensorTransf);
 
 	void PreprocessRays(uint32_t Channels, uint32_t MaxPointsPerChannel) override;
 	bool PostprocessDetection(FDetection& Detection) const;
@@ -49,11 +54,17 @@ private:
 
 	std::vector<std::string> SplitString(const std::string& Input, char Delimiter) const;
 
-	void GetStepSizeData(std::string Alpha) const;
+	void GetStepSizeData(float FogDensity) const;
 
-	std::string GetAlphaByFogDensity(float FogDensity) const;
+	std::string GetAlphaInFileName(float FogDensity) const;
 
-	float GetReflectivityFromHitResult(const FHitResult& HitResult) const;
+	float PiecewiseLinearRegression(const std::vector<FogDensityDataPoint>& data, float x) const;
+
+	float CalculateMOR(const float FogDensity) const;
+
+	float GetReflectivity(const uint32 ObjectTag) const;
+
+	float LookupReflectivityTable(FString ActorLabel) const;
 
 	std::string GetPathSeparator() const;
 
@@ -70,6 +81,12 @@ private:
 	float DropOffAlpha;
 	float DropOffBeta;
 
-	mutable std::string CacheAlpha;
+	// mutable std::string CacheAlpha;
+	float CurrentFogDensity;
 	mutable std::map<std::string, std::vector<std::string>> StepSizeData;
+
+	// Fog Simulation Parameter
+	float Mor = 10000;
+	float Alpha = 0.0f;
+	float Beta;
 };

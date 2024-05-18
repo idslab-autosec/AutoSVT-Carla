@@ -53,25 +53,24 @@ namespace carla
       public:
         geom::Location point;
         float intensity;
-        // uint32_t original_intensity;
-        // uint32_t is_modified;
-        // uint32_t actor_type;
+        uint32_t object_tag;
 
-        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0.0f} { }
-        LidarWithFogDetection(float x, float y, float z, float intensity) : point(x, y, z), intensity{intensity} { }
-        LidarWithFogDetection(geom::Location p, float intensity) : point(p), intensity{intensity} { }
+        LidarWithFogDetection() : point(0.0f, 0.0f, 0.0f), intensity{0.0f}, object_tag{0} { }
+        LidarWithFogDetection(float x, float y, float z, float intensity, uint32_t object_tag) : point(x, y, z), intensity{intensity}, object_tag{object_tag} { }
+        LidarWithFogDetection(geom::Location p, float intensity, uint32_t object_tag) : point(p), intensity{intensity}, object_tag{object_tag} { }
 
         void WritePlyHeaderInfo(std::ostream &out) const
         {
           out << "property float32 x\n" \
                  "property float32 y\n" \
                  "property float32 z\n" \
-                 "property float32 I";
+                 "property float32 I\n" \
+                 "property uint32_t object_tag";
         }
 
         void WriteDetection(std::ostream &out) const
         {
-          out << point.x << ' ' << point.y << ' ' << point.z << ' ' << intensity;
+          out << point.x << ' ' << point.y << ' ' << point.z << ' ' << intensity << ' ' << object_tag;
         }
       };
 #pragma pack(pop)
@@ -98,15 +97,18 @@ namespace carla
               std::accumulate(points_per_channel.begin(), points_per_channel.end(), 0));
 
           _points.clear();
-          _points.reserve(total_points * 4);
+          // _points.reserve(total_points * 5);
+          _points.reserve(total_points);
         }
 
         void WritePointSync(LidarWithFogDetection &detection)
         {
-          _points.emplace_back(detection.point.x);
-          _points.emplace_back(detection.point.y);
-          _points.emplace_back(detection.point.z);
-          _points.emplace_back(detection.intensity);
+          _points.emplace_back(detection);
+          // _points.emplace_back(detection.point.x);
+          // _points.emplace_back(detection.point.y);
+          // _points.emplace_back(detection.point.z);
+          // _points.emplace_back(detection.intensity);
+          // _points.emplace_back(detection.object_tag);
         }
 
         virtual void WritePointSync(SemanticLidarDetection &detection)
@@ -116,8 +118,8 @@ namespace carla
         }
 
       private:
-        std::vector<float> _points;
-
+        // std::vector<float> _points;
+        std::vector<LidarWithFogDetection> _points;
         friend class s11n::LidarWithFogSerializer;
         friend class s11n::LidarWithFogHeaderView;
       };
